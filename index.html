@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mahjong Match Entry</title>
+<style>
+:root{--bg:#f3f6f1;--card:#fff;--text:#1d2a1d;--muted:#6b7a6b;--line:#d5dfd2;--green:#2f6b2f;--greenTxt:#fff;--accent:#c0392b;--ok:#2f6b2f;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121712;--card:#1c241c;--text:#e8efe6;--muted:#93a393;--line:#344034;--green:#5fa65f;--greenTxt:#0e160e;--accent:#e57366;--ok:#7fc77f}}
+:root[data-theme="dark"]{--bg:#121712;--card:#1c241c;--text:#e8efe6;--muted:#93a393;--line:#344034;--green:#5fa65f;--greenTxt:#0e160e;--accent:#e57366;--ok:#7fc77f}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif;font-size:16px}
+main{max-width:520px;margin:0 auto;padding:16px 14px 40px}
+h1{font-size:22px;margin:4px 0 2px;color:var(--green)}
+.sub{color:var(--muted);font-size:13px;margin:0 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 10px}
+label{display:block;font-size:13px;color:var(--muted);margin:10px 0 4px}
+label:first-of-type{margin-top:0}
+select{width:100%;padding:12px;font-size:16px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);min-height:46px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid label{margin-top:0}
+.check{display:flex;align-items:center;gap:10px;margin-top:14px;font-size:16px;color:var(--text)}
+.check input{width:24px;height:24px;accent-color:var(--green)}
+.pts{font-size:13px;color:var(--muted);margin-top:6px}
+.pts b{color:var(--green)}
+button{width:100%;padding:15px;font-size:17px;font-weight:600;border:0;border-radius:12px;background:var(--green);color:var(--greenTxt);margin-top:6px;min-height:50px}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--line);font-size:14px;padding:10px;min-height:40px;margin-top:10px}
+.err{color:var(--accent);font-size:14px;margin-top:10px;min-height:18px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,30px);background:var(--ok);color:var(--greenTxt);padding:12px 18px;border-radius:24px;font-weight:600;opacity:0;transition:.25s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;font-size:12px;width:100%;min-width:480px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--muted);font-weight:600}
+.note{font-size:12px;color:var(--muted);margin-top:8px}
+.empty{color:var(--muted);font-size:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Mahjong Match Entry</h1>
+<p class="sub">Prototype · entries are saved on this device only, not yet written to Excel</p>
+
+<form id="f" class="card" autocomplete="off">
+  <h2>Table (stays filled)</h2>
+  <div class="grid">
+    <div><label for="p0">East</label><select id="p0"></select></div>
+    <div><label for="p1">South</label><select id="p1"></select></div>
+    <div><label for="p2">West</label><select id="p2"></select></div>
+    <div><label for="p3">North</label><select id="p3"></select></div>
+  </div>
+  <label for="game">Game type</label>
+  <select id="game"></select>
+</form>
+
+<div class="card">
+  <h2>This game (resets after submit)</h2>
+  <label for="winner">Winner</label>
+  <select id="winner"></select>
+  <label for="faan">Faan</label>
+  <select id="faan"></select>
+  <div class="pts" id="pts">Points: <b>–</b></div>
+  <label for="donor">Donater (who discarded the winning tile)</label>
+  <select id="donor"></select>
+  <label for="special">Special hand type (optional)</label>
+  <select id="special"></select>
+  <label class="check"><input type="checkbox" id="ollie"> Ollie keeper</label>
+  <div class="err" id="err" role="alert"></div>
+  <button id="submit" type="button">Submit game</button>
+</div>
+
+<div class="card">
+  <h2>Recent entries (this device)</h2>
+  <div id="log"></div>
+  <button class="ghost" id="undo" type="button">Undo last entry</button>
+  <div class="note">Each row below is what would be appended to the Match History table. Points are looked up from Faan, as in your Reference sheet.</div>
+</div>
+</main>
+<div class="toast" id="toast">Game recorded ✓</div>
+
+<script>
+const PLAYERS=["Edmund","Jenny","Jarrod","Eric","Linc","Cass","Harry","Nick","Dora","Anson","Ada","Nicole","Parlour Staff","Elaine","Will","Liem","Bea","Chloe","Muhammad"];
+const GAMES=["Hong Kong","Aussie Rules","Sichuan","3-person"];
+const SPECIAL=["13 Orphans","Big Four Winds","Big Three Dragons","All Honours","Heavenly Hand"];
+const PTS={0:1,1:2,2:4,3:8,4:16,5:24,6:32,7:48,8:64,9:96,10:128,11:192,12:246,13:384,14:384,15:384,16:384,17:384,18:384,19:384,20:384,"-10":-384};
+const $=id=>document.getElementById(id);
+let log=[];
+
+function opts(sel,items,blank){
+  sel.innerHTML="";
+  if(blank!==undefined){const o=document.createElement("option");o.value="";o.textContent=blank;sel.appendChild(o);}
+  items.forEach(v=>{const o=document.createElement("option");o.value=v;o.textContent=v;sel.appendChild(o);});
+}
+function save(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}}
+function load(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}}
+
+function table(){return [0,1,2,3].map(i=>$("p"+i).value);}
+
+function refreshDependent(){
+  const t=table().filter(Boolean);
+  const w=$("winner").value, d=$("donor").value;
+  opts($("winner"),[...t,"Draw","Zha Wu"],"Select winner");
+  if([...t,"Draw","Zha Wu"].includes(w))$("winner").value=w;
+  const donors=["Self",...t.filter(x=>x!==$("winner").value)];
+  opts($("donor"),donors,"Select donater");
+  if(donors.includes(d))$("donor").value=d;
+  const draw=$("winner").value==="Draw";
+  $("faan").disabled=draw;$("donor").disabled=draw;
+  updatePts();
+}
+function updatePts(){
+  const f=$("faan").value;
+  $("pts").innerHTML="Points: <b>"+(f!==""&&PTS[f]!==undefined&&!$("faan").disabled?PTS[f]:"–")+"</b>";
+}
+function resetGame(){
+  $("winner").value="";$("donor").value="";$("special").value="";$("ollie").checked=false;
+  $("faan").value="";
+  refreshDependent();
+}
+function renderLog(){
+  const el=$("log");
+  if(!log.length){el.innerHTML='<div class="empty">No entries yet.</div>';return;}
+  const rows=log.slice(-8).reverse().map(r=>"<tr>"+[r.date,r.game,r.winner,r.faan,r.points,r.touch,r.e,r.s,r.w,r.n,r.ollie,r.notes].map(x=>"<td>"+(x??"")+"</td>").join("")+"</tr>").join("");
+  el.innerHTML='<div class="scroll"><table><thead><tr>'+["Date","Rule Set","Winner","Faan","Points","Touch who?","East","South","West","North","Ollie","Notes"].map(h=>"<th>"+h+"</th>").join("")+"</tr></thead><tbody>"+rows+"</tbody></table></div>";
+}
+function toast(){const t=$("toast");t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1800);}
+
+function submit(){
+  const t=table(),w=$("winner").value,draw=w==="Draw";
+  const err=m=>{$("err").textContent=m;return false;};
+  if(t.some(x=>!x))return err("Please choose all four players.");
+  if(new Set(t).size<4)return err("The four players must be different.");
+  if(!w)return err("Please choose a winner.");
+  if(!draw){
+    if($("faan").value==="")return err("Please choose the Faan.");
+    if(!$("donor").value)return err("Please choose the donater (or Self).");
+    if($("donor").value===w)return err("The donater can't be the winner.");
+  }
+  $("err").textContent="";
+  const faan=draw?"":Number($("faan").value);
+  const row={date:new Date().toLocaleString("en-AU",{dateStyle:"short",timeStyle:"short"}),game:$("game").value,winner:w,faan:faan,points:draw?"":PTS[faan],touch:draw?"":$("donor").value,e:t[0],s:t[1],w:t[2],n:t[3],ollie:$("ollie").checked?"Ollie Keeper":"",notes:$("special").value};
+  log.push(row);save("log",log);
+  renderLog();resetGame();toast();window.scrollTo({top:0,behavior:"smooth"});
+}
+
+// init
+[0,1,2,3].forEach(i=>opts($("p"+i),PLAYERS,"Select player"));
+opts($("game"),GAMES);
+opts($("faan"),[...Array.from({length:14},(_,i)=>i===13?"13":String(i)),"-10"],"Select Faan");
+$("faan").options[14].textContent="-10 (penalty)";
+$("faan").options[14].value="-10";
+$("faan").options[14].text="-10 (penalty)";
+opts($("special"),SPECIAL,"None");
+opts($("winner"),[],"Select winner");opts($("donor"),[],"Select donater");
+
+const saved=load("table",{p:["","","",""],g:"Hong Kong"});
+saved.p.forEach((v,i)=>$("p"+i).value=v);
+$("game").value=saved.g;
+log=load("log",[]);
+
+["p0","p1","p2","p3"].forEach(id=>$(id).addEventListener("change",()=>{save("table",{p:table(),g:$("game").value});refreshDependent();}));
+$("game").addEventListener("change",()=>save("table",{p:table(),g:$("game").value}));
+$("winner").addEventListener("change",refreshDependent);
+$("faan").addEventListener("change",updatePts);
+$("submit").addEventListener("click",submit);
+$("undo").addEventListener("click",()=>{log.pop();save("log",log);renderLog();});
+refreshDependent();renderLog();
+</script>
+</body>
+</html>
